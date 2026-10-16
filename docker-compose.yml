@@ -1,0 +1,41 @@
+# docker-compose.yml —— 在 docker-empty:box64 容器里手动部署 GSM（免特权）
+# ----------------------------------------------------------------------------
+# 镜像：ghcr.io/ly921002/docker-empty:box64（arm64 + box64 + x86_64 运行库已内置）。
+# 流程：先 up 起容器 -> 拷入并执行 deploy-gsm.sh 部署 GSM -> 启动面板（映射 3001）。
+#
+#   docker login ghcr.io
+#   docker compose up -d
+#   docker cp deploy-gsm.sh box64-gsm:/root/deploy-gsm.sh
+#   docker exec -it box64-gsm bash /root/deploy-gsm.sh     # 部署 GSM + SteamCMD
+#   docker exec -d  box64-gsm /root/gsm/start-box64.sh    # 启动面板
+#   # 排错前台跑：docker exec -it box64-gsm /root/gsm/start-box64.sh
+#   # 启动器内部：cd /root/gsm && node --require /root/gsm/arch-x64.cjs server/index.js
+#   #   面板本体 = arm64 原生 Node（快且稳），arch 伪装成 x64 解锁 SteamCMD；
+#   #   x86_64 的 SteamCMD/pty/zip/7z 走 box64 包装脚本，作为子进程运行。
+#   # 面板：http://<宿主IP>:3001   （server/.env: SERVER_PORT=3001）
+#
+# 说明：
+#   - 免特权、不注册 binfmt；SteamCMD 等 x86_64 二进制靠 box64 包装脚本运行（deploy-gsm.sh 做的）。
+#   - 仅 arm64 宿主有效。
+#   - SteamCMD 下载的 x86_64 游戏服务端：免特权模式下需在 GSM 里把「启动命令」写成
+#     `box64 ./<服务端二进制>`。若想透明运行（不用写前缀），取消下面 privileged 注释，
+#     并在容器内注册 box64 binfmt（需要该注册步骤时告诉我，我再补脚本）。
+# ----------------------------------------------------------------------------
+
+services:
+  gsm:
+    image: ghcr.io/ly921002/docker-empty:box64
+    container_name: box64-gsm
+    restart: unless-stopped
+    ports:
+      - "3001:3001"          # GSM 面板端口
+    volumes:
+      - gsm_root:/root       # 持久化 GSM、源码、SteamCMD
+    stdin_open: true
+    tty: true
+    # 常驻；GSM 面板通过 docker exec 启动（或用下面的 privileged 模式配合 binfmt）
+    command: ["sleep", "infinity"]
+    # privileged: true       # 仅在你想让游戏服务端透明运行（不手写 box64 前缀）时开启
+
+volumes:
+  gsm_root:
