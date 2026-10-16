@@ -144,14 +144,32 @@ SteamCMD 已验证可完整下载安装（实测 Don't Starve Together / AppID 3
 
 **服务端是 x86_64，免特权模式下启动命令必须加 `box64` 前缀。** 以饥荒联机版为例：
 
+> ⚠️ **坑：工作目录必须是 `bin64/`，不是安装根目录。**
+> DST 服务端会 `../data` 去取 `databundles/*.zip`。cwd 在根目录时会报
+> `Error, failed to change working directory to ../data` →
+> `Mounting file system databundles/*.zip skipped` → `Could not load lua file scripts/main.lua`。
+>
+> GSM 实例设置：
+> - 工作目录：`/home/steam/games/Dont_Starve_Together/bin64`
+> - 启动命令：`box64 ./dontstarve_dedicated_server_nullrenderer_x64 -cluster Cluster_1 -shard Master`
+>
+> 若没有工作目录字段，启动命令写成：
+> `cd /home/steam/games/Dont_Starve_Together/bin64 && box64 ./dontstarve_dedicated_server_nullrenderer_x64 -cluster Cluster_1 -shard Master`
+
+验证：
+
+```bash
+docker exec -it box64-gsm bash -c 'cd /home/steam/games/Dont_Starve_Together/bin64 && box64 ./dontstarve_dedicated_server_nullrenderer_x64 -cluster Cluster_1 -shard Master'
+# 成功标志：Machine Arch: x86_64 / Mode: 64-bit /
+#           Renderer initialize: Okay / AnimManager initialize: Okay / LOADING LUA
+```
+
+已知无害日志（不用管）：`Error loading needed lib libsteam.so`、
+`[S_API FAIL] STEAMUGC_INTERFACE_VERSION016`、退出时 `Sigfault/Segbus while quitting`。
+
 ```bash
 # 1) 看有哪些二进制、分别是什么架构
 docker exec box64-gsm bash -c 'cd /home/steam/games/Dont_Starve_Together && file bin*/dontstarve* 2>/dev/null'
-
-# 2) 优先用 bin64（x86_64，镜像已内置 amd64 运行库）
-#    在 GSM 实例「启动命令」里填：
-box64 ./bin64/dontstarve_dedicated_server_nullrenderer
-```
 
 缺库排查（最常见是 `libcurl-gnutls.so.4`，镜像装的是 `libcurl4:amd64`，名字不同）：
 
