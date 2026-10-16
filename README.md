@@ -137,6 +137,33 @@ GSM 的预检逻辑在 `server/src/routes/gameDeployment.ts` 的 `checkLinuxStea
 `fix-steamcmd.sh` 生成的包装脚本会优先跑 `box64 linux64/steamcmd`，没有才回退
 `box64 linux32/steamcmd.bin`（BOX32 转 i386）。
 
+## 部署游戏服务端
+
+SteamCMD 已验证可完整下载安装（实测 Don't Starve Together / AppID 343050，4.49 GB，
+`Success! App '343050' fully installed.`）。
+
+**服务端是 x86_64，免特权模式下启动命令必须加 `box64` 前缀。** 以饥荒联机版为例：
+
+```bash
+# 1) 看有哪些二进制、分别是什么架构
+docker exec box64-gsm bash -c 'cd /home/steam/games/Dont_Starve_Together && file bin*/dontstarve* 2>/dev/null'
+
+# 2) 优先用 bin64（x86_64，镜像已内置 amd64 运行库）
+#    在 GSM 实例「启动命令」里填：
+box64 ./bin64/dontstarve_dedicated_server_nullrenderer
+```
+
+缺库排查（最常见是 `libcurl-gnutls.so.4`，镜像装的是 `libcurl4:amd64`，名字不同）：
+
+```bash
+docker exec -it box64-gsm bash -c 'apt-get update && apt-get install -y libcurl3-gnutls:amd64'
+# 装不到就软链
+docker exec -it box64-gsm ln -sf /lib/x86_64-linux-gnu/libcurl.so.4 \
+                                 /lib/x86_64-linux-gnu/libcurl-gnutls.so.4
+# 看还缺什么
+docker exec -it box64-gsm bash -c 'cd /home/steam/games/Dont_Starve_Together && BOX64_LOG=1 box64 ./bin64/dontstarve_dedicated_server_nullrenderer 2>&1 | grep -i "not found"'
+```
+
 ## 最终架构（已验收）
 
 ```
