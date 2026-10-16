@@ -1,9 +1,5 @@
 # 在 box64 容器里手动部署 GSM（GameServerManager）+ SteamCMD
 
-`gsm-box64`（专用 GSM 镜像）项目已删除，改在 **`docker-empty:box64` 容器里手动部署 GSM**。
-
-**结论：可以。** 但必须解决两件事，否则面板依旧用不了 SteamCMD；另外**启动路径**也有坑（见第 3 点）。
-
 ## 三个关键点
 
 1. **让 `process.arch` / `os.arch()` 返回 `x64`——但面板本体跑 arm64 原生 Node**
