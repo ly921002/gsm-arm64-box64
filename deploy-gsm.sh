@@ -27,7 +27,7 @@
 # 目录约定（务必遵守，GSM3 用 process.cwd() 解析 data/ 与 lib/）：
 #   /root/gsm            <- 包根目录（= dist/package 的内容），【必须在这里启动】
 #     ├ start-box64.sh   <- 本脚本生成的启动器：arm64 node + arch 伪装 + server/index.js
-#     ├ arch-x64.cjs     <- 架构伪装预加载脚本
+#     ├ arch-spoof.cjs   <- 架构伪装预加载脚本（只改 os.arch()）
 #     ├ server/index.js  <- 后端入口
 #     ├ public/          <- 前端（由 client/dist 复制而来）
 #     └ data/{games,gameconfig,plugins,lib}
@@ -141,7 +141,7 @@ cat > "$GSM_RUN/start-box64.sh" <<EOF
 #!/bin/bash
 # 必须在包根目录运行：DATA_DIR=./data 与 data/lib 都按 process.cwd() 解析
 cd "$GSM_RUN"
-exec "$ARM_NODE" --require "$GSM_RUN/arch-x64.cjs" server/index.js
+exec "$ARM_NODE" --require "$GSM_RUN/arch-spoof.cjs" server/index.js
 EOF
 chmod +x "$GSM_RUN/start-box64.sh"
 
@@ -162,19 +162,26 @@ fi
 chmod +x steamcmd.sh 2>/dev/null || true
 [ -f steamcmd ] && wrap_bin "$STEAMCMD_DIR/steamcmd"
 
-# ---------- 8) x64 资产（PTY / zip / 7z）+ box64 包装 ----------
-echo ">> 下载并包装 x64 资产"
-# PTY：MCSManager/PTY release 297277624 的 linux-x64 资产（与源码 ptyAssets.ts 一致）
-[ -e "$LIB_DIR/pty_linux_x64" ] || \
+# ---------- 8) arm64 原生资产（PTY / zip / 7z）—— 不包装 ----------
+# process.arch 保持 arm64，GSM 会按 arm64 选资产；必须是原始 ELF，
+# 否则 ptyAssets 的固定「大小 + SHA-256」校验判定不可信 -> PTY 能力不可用。
+echo ">> 下载 arm64 原生资产（不包装）"
+# PTY：MCSManager/PTY release 297277624，源码 ptyAssets.ts 固定清单
+#   name pty_linux_arm64 / assetId 374651727 / size 2752664
+#   sha256 48d8496997053b60eb84d2b02f4ec751298c7f214c615b08aca43309739ebf83
+[ -f "$LIB_DIR/pty_linux_arm64" ] || \
   wget -q --tries=3 --header="Accept: application/octet-stream" \
-    -O "$LIB_DIR/pty_linux_x64" https://api.github.com/repos/MCSManager/PTY/releases/assets/374651721
-wrap_bin "$LIB_DIR/pty_linux_x64"
+    -O "$LIB_DIR/pty_linux_arm64" https://api.github.com/repos/MCSManager/PTY/releases/assets/374651727
+chmod +x "$LIB_DIR/pty_linux_arm64"
+echo "   pty_linux_arm64 sha256=$(sha256sum "$LIB_DIR/pty_linux_arm64" 2>/dev/null | awk '{print $1}')"
+echo "   期望            48d8496997053b60eb84d2b02f4ec751298c7f214c615b08aca43309739ebf83"
 
-for a in file_zip_linux_x64 7z_linux_x64; do
-  [ -e "$LIB_DIR/$a" ] || \
+for a in file_zip_linux_arm64 7z_linux_arm64; do
+  [ -f "$LIB_DIR/$a" ] || \
     wget -q --tries=3 -O "$LIB_DIR/$a" "https://github.com/MCSManager/Zip-Tools/releases/latest/download/$a"
-  wrap_bin "$LIB_DIR/$a"
+  chmod +x "$LIB_DIR/$a"
 done
+ls -la "$LIB_DIR" | sed 's/^/   /'
 
 # ---------- 9) 结果 ----------
 echo
@@ -183,8 +190,12 @@ echo "启动面板：   docker exec -d  box64-gsm $GSM_RUN/start-box64.sh"
 echo "排错前台：   docker exec -it box64-gsm $GSM_RUN/start-box64.sh"
 echo "确认进程：   docker exec box64-gsm ps -aux | grep -i node"
 echo "确认监听：   docker exec box64-gsm ss -ltnp | grep 3001"
-echo "SteamCMD：   docker exec -it box64-gsm /root/steamcmd/steamcmd +quit"
 echo "面板访问：   http://<宿主IP>:3001   （server/.env: SERVER_PORT=3001）"
+echo "SteamCMD：   docker exec -it box64-gsm bash /root/fix-steamcmd.sh   （先拷入容器）"
+echo
+echo "下一步（必须做，否则部署游戏会报缺少 32 位 ELF loader）："
+echo "  docker cp fix-steamcmd.sh box64-gsm:/root/fix-steamcmd.sh"
+echo "  docker exec -it box64-gsm bash /root/fix-steamcmd.sh"
 echo
 echo "注意："
 echo "  1) 必须在 $GSM_RUN 目录下启动（start-box64.sh 已内置 cd），"
@@ -192,4 +203,5 @@ echo "     GSM3 用 process.cwd() 解析 DATA_DIR=./data 与 data/lib、server/d
 echo "  2) SteamCMD 下载的 x86_64 游戏服务端是动态二进制，免特权模式下"
 echo "     需在 GSM 里把该游戏的「启动命令」写成：box64 ./<服务端二进制>"
 echo "     （如需透明运行，改用 privileged + 容器内注册 binfmt，见 README）"
+echo "  3) 在面板里「安装/更新 SteamCMD」会下到 GSM 自己的目录，装完需再跑一次 fix-steamcmd.sh"
 echo "=================================================="
