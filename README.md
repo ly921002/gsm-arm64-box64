@@ -18,14 +18,15 @@
 
 - arm64 宿主（已在 Oracle Cloud ARM64 / Ubuntu 24.04 aarch64 验证）
 - 宿主已装好 Docker、`/usr/bin/runc` 可用
-- 能拉取私有镜像：`docker login ghcr.io`
+- 能访问 ghcr.io —— `ghcr.io/ly921002/docker-empty:box64` 是**公开镜像，无需 `docker login`**
 
 ## 部署步骤
 
 ### 1. 起容器
 
+镜像 `ghcr.io/ly921002/docker-empty:box64` 为公开镜像，直接拉取即可（无需 `docker login`）。
+
 ```bash
-docker login ghcr.io
 docker compose up -d
 ```
 

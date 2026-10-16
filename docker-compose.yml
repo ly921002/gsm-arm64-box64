@@ -1,15 +1,18 @@
 # docker-compose.yml —— 在 docker-empty:box64 容器里手动部署 GSM（免特权）
 # ----------------------------------------------------------------------------
-# 镜像：ghcr.io/ly921002/docker-empty:box64（arm64 + box64 + x86_64 运行库已内置）。
-# 流程：先 up 起容器 -> 拷入并执行 deploy-gsm.sh 部署 GSM -> 启动面板（映射 3001）。
+# 镜像：ghcr.io/ly921002/docker-empty:box64
+#   arm64 + box64（编译带 -D BOX32=ON -D BOX32_BINFMT=ON，可直接跑 i386）
+#   + 已内置 amd64(x86_64) 运行库。镜像公开，无需 docker login。
+# 流程：先 up 起容器 -> 拷入并执行 deploy-gsm.sh -> fix-steamcmd.sh -> 启动面板（映射 3001）。
 #
-#   docker login ghcr.io
 #   docker compose up -d
 #   docker cp deploy-gsm.sh box64-gsm:/root/deploy-gsm.sh
-#   docker exec -it box64-gsm bash /root/deploy-gsm.sh     # 部署 GSM + SteamCMD
+#   docker exec -it box64-gsm bash /root/deploy-gsm.sh     # 部署 GSM + 装 arm64 原生资产
+#   docker cp fix-steamcmd.sh box64-gsm:/root/fix-steamcmd.sh
+#   docker exec -it box64-gsm bash /root/fix-steamcmd.sh   # 包装 SteamCMD 入口为 box64
 #   docker exec -d  box64-gsm /root/gsm/start-box64.sh    # 启动面板
 #   # 排错前台跑：docker exec -it box64-gsm /root/gsm/start-box64.sh
-#   # 启动器内部：cd /root/gsm && node --require /root/gsm/arch-x64.cjs server/index.js
+#   # 启动器内部：cd /root/gsm && node --require /root/gsm/arch-spoof.cjs server/index.js
 #   #   面板本体 = arm64 原生 Node（快且稳），arch 伪装成 x64 解锁 SteamCMD；
 #   #   x86_64 的 SteamCMD/pty/zip/7z 走 box64 包装脚本，作为子进程运行。
 #   # 面板：http://<宿主IP>:3001   （server/.env: SERVER_PORT=3001）
